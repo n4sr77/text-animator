@@ -33,6 +33,15 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
           if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
 
+      - name: Pin pip to a pip-tools-compatible release
+        shell: pwsh
+        run: |
+          $script = 'source\prepare_windows.ps1'
+          $raw = Get-Content -LiteralPath $script -Raw
+          if ($raw -notmatch 'pip<27') { throw 'Expected pip<27 pin not found in prepare_windows.ps1; review the build script before proceeding.' }
+          $raw = $raw.Replace('pip<27', 'pip<26')
+          Set-Content -LiteralPath $script -Value $raw -Encoding utf8
+
       - name: Install Inno Setup
         shell: pwsh
         run: |
