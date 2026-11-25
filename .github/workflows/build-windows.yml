@@ -64,7 +64,7 @@ jobs:
           foreach ($file in $buildInputs) {
             $content = Get-Content -LiteralPath $file.FullName
             if (!($content -match '^\s*setuptools(?:\s|[<=>!~\[]|$)')) {
-              Add-Content -LiteralPath $file.FullName -Value 'setuptools==80.9.0' -Encoding utf8
+              Add-Content -LiteralPath $file.FullName -Value 'setuptools==81.0.0' -Encoding utf8
               Write-Host "Pinned setuptools for hash-locked PyInstaller build: $($file.FullName)"
             }
           }
