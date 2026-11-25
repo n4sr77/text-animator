@@ -42,16 +42,23 @@ jobs:
           $raw = $raw.Replace('pip<27', 'pip<25')
           Set-Content -LiteralPath $script -Value $raw -Encoding utf8
 
-      - name: Keep pip-tools out of the runtime build lock
+      - name: Keep pip-tools out of the hash-locked build dependencies
         shell: pwsh
         run: |
-          $requirements = 'source\\requirements-build-windows.in'
-          if (!(Test-Path $requirements)) { throw "Build requirements file not found: $requirements" }
-          $lines = Get-Content -LiteralPath $requirements
-          $filtered = @($lines | Where-Object { $_ -notmatch '^\\s*pip-tools(?:\\s|[<=>!~\\[]|$)' })
-          if ($filtered.Count -eq $lines.Count) { throw 'pip-tools entry was not found in requirements-build-windows.in; inspect the package before continuing.' }
-          Set-Content -LiteralPath $requirements -Value $filtered -Encoding utf8
-          Write-Host 'Removed pip-tools from the final build lock input. pip-tools remains installed in the preparation environment to compile the lock files.'
+          $inputs = Get-ChildItem -Path 'source' -Filter 'requirements*.in' -File -Recurse
+          if (!$inputs) { throw 'No requirements*.in input files were found in the source package.' }
+          $removed = 0
+          foreach ($file in $inputs) {
+            $lines = Get-Content -LiteralPath $file.FullName
+            $filtered = @($lines | Where-Object { $_ -notmatch '^\\s*pip-tools(?:\\s|[<=>!~\\[]|$)' })
+            if ($filtered.Count -lt $lines.Count) {
+              Set-Content -LiteralPath $file.FullName -Value $filtered -Encoding utf8
+              Write-Host "Removed pip-tools from $($file.FullName)"
+              $removed++
+            }
+          }
+          if ($removed -eq 0) { throw 'No pip-tools requirement was found in the source requirement inputs; refusing to continue with an unsafe lock.' }
+          Write-Host 'pip-tools remains installed in the preparation environment to compile lock files, but is excluded from the final build dependency locks.'
 
       - name: Install Inno Setup
         shell: pwsh
