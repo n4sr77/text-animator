@@ -42,6 +42,17 @@ jobs:
           $raw = $raw.Replace('pip<27', 'pip<25')
           Set-Content -LiteralPath $script -Value $raw -Encoding utf8
 
+      - name: Keep pip-tools out of the runtime build lock
+        shell: pwsh
+        run: |
+          $requirements = 'source\\requirements-build-windows.in'
+          if (!(Test-Path $requirements)) { throw "Build requirements file not found: $requirements" }
+          $lines = Get-Content -LiteralPath $requirements
+          $filtered = @($lines | Where-Object { $_ -notmatch '^\\s*pip-tools(?:\\s|[<=>!~\\[]|$)' })
+          if ($filtered.Count -eq $lines.Count) { throw 'pip-tools entry was not found in requirements-build-windows.in; inspect the package before continuing.' }
+          Set-Content -LiteralPath $requirements -Value $filtered -Encoding utf8
+          Write-Host 'Removed pip-tools from the final build lock input. pip-tools remains installed in the preparation environment to compile the lock files.'
+
       - name: Install Inno Setup
         shell: pwsh
         run: |
