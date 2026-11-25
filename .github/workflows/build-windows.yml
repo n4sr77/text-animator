@@ -69,6 +69,16 @@ jobs:
             }
           }
 
+      - name: Include unsafe build tools in the hash-locked wheel manifest
+        shell: pwsh
+        run: |
+          $script = 'source\prepare_windows.ps1'
+          $raw = Get-Content -LiteralPath $script -Raw
+          if ($raw -notmatch '--generate-hashes') { throw 'Expected pip-compile --generate-hashes option was not found.' }
+          $raw = $raw.Replace('--generate-hashes', '--generate-hashes --allow-unsafe')
+          Set-Content -LiteralPath $script -Value $raw -Encoding utf8
+          Write-Host 'Enabled pip-compile --allow-unsafe so setuptools is pinned and hashed in the build lock.'
+          
       - name: Install Inno Setup
         shell: pwsh
         run: |
