@@ -78,7 +78,11 @@ jobs:
       - name: Resolve and download pinned Windows wheels
         shell: pwsh
         working-directory: source
-        run: ./prepare_windows.ps1
+        run: |
+          $constraints = Join-Path $env:GITHUB_WORKSPACE 'source\\wheel-constraints.txt'
+          Set-Content -LiteralPath $constraints -Value 'setuptools==81.0.0' -Encoding utf8
+          $env:PIP_CONSTRAINT = $constraints
+          ./prepare_windows.ps1
 
       - name: Build and test TextAnimator
         shell: pwsh
