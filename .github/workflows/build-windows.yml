@@ -59,6 +59,15 @@ jobs:
           }
           if ($removed -eq 0) { throw 'No pip-tools requirement was found in the source requirement inputs; refusing to continue with an unsafe lock.' }
           Write-Host 'pip-tools remains installed in the preparation environment to compile lock files, but is excluded from the final build dependency locks.'
+          $buildInputs = Get-ChildItem -Path 'source' -Filter '*build*.in' -File -Recurse
+          if (!$buildInputs) { throw 'No build requirements input file was found for pinning setuptools.' }
+          foreach ($file in $buildInputs) {
+            $content = Get-Content -LiteralPath $file.FullName
+            if (!($content -match '^\s*setuptools(?:\s|[<=>!~\[]|$)')) {
+              Add-Content -LiteralPath $file.FullName -Value 'setuptools==80.9.0' -Encoding utf8
+              Write-Host "Pinned setuptools for hash-locked PyInstaller build: $($file.FullName)"
+            }
+          }
 
       - name: Install Inno Setup
         shell: pwsh
