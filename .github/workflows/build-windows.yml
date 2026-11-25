@@ -33,6 +33,21 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
           if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
 
+      - name: Make FFmpeg regression fixture Windows-compatible
+        shell: pwsh
+        run: |
+          $test = 'source\tests\test_media_audio_replace.py'
+          if (!(Test-Path $test)) { throw "Expected media regression test not found: $test" }
+          $raw = Get-Content -LiteralPath $test -Raw
+          $old = '    output = tmp_path / "out.mp4"'
+          if (!$raw.Contains($old)) { throw 'Expected FFmpeg test fixture anchor was not found.' }
+          $insert = $old + "`r`n    fake_ffmpeg = tmp_path / 'ffmpeg.exe'`r`n    fake_ffmpeg.write_bytes(b'')"
+          $raw = $raw.Replace($old, $insert)
+          if (!$raw.Contains('return_value="/usr/bin/ffmpeg"')) { throw 'Expected POSIX-only FFmpeg mock was not found.' }
+          $raw = $raw.Replace('return_value="/usr/bin/ffmpeg"', 'return_value=str(fake_ffmpeg)')
+          Set-Content -LiteralPath $test -Value $raw -Encoding utf8
+          Write-Host 'Updated FFmpeg test fixture to use a real temporary Windows path.'
+
       - name: Pin pip below 25.3 for pip-tools 7.5.0 compatibility
         shell: pwsh
         run: |
