@@ -1,0 +1,73 @@
+name: Build TextAnimator Windows Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11 x64
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+
+      - name: Extract uploaded source package
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:GITHUB_WORKSPACE 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
+          if (!(Test-Path $archive)) { throw "Source archive not found: $archive" }
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
+          if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+
+      - name: Resolve and download pinned Windows wheels
+        shell: pwsh
+        working-directory: source
+        run: ./prepare_windows.ps1
+
+      - name: Build and test TextAnimator
+        shell: pwsh
+        working-directory: source
+        run: ./build_windows.ps1
+
+      - name: Build persistent Windows installer
+        shell: pwsh
+        working-directory: source
+        run: ./build_installer.ps1
+
+      - name: Verify installer output
+        shell: pwsh
+        working-directory: source
+        run: |
+          $setup = Get-ChildItem -Path 'installer-output' -Filter '*Setup.exe' -Recurse | Select-Object -First 1
+          if (!$setup) { throw 'Installer EXE was not produced.' }
+          if ($setup.Length -lt 10MB) { throw "Installer is unexpectedly small: $($setup.Length) bytes" }
+          Write-Host "Installer: $($setup.FullName)"
+          Write-Host "Size: $([math]::Round($setup.Length / 1MB, 2)) MB"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TextAnimator-Windows-Setup
+          path: source/installer-output/*Setup.exe
+          if-no-files-found: error
+          retention-days: 30
