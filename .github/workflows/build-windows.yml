@@ -94,6 +94,16 @@ jobs:
           $env:PIP_CONSTRAINT = $constraints
           ./prepare_windows.ps1
 
+      - name: Install FFmpeg for media regression tests
+        shell: pwsh
+        run: |
+          choco install ffmpeg --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg installation failed.' }
+          $ffmpeg = Get-Command ffmpeg.exe -ErrorAction Stop
+          $ffmpegDir = Split-Path -Parent $ffmpeg.Source
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $ffmpegDir
+          & $ffmpeg.Source -version
+
       - name: Build and test TextAnimator
         shell: pwsh
         working-directory: source
