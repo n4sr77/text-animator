@@ -50,7 +50,7 @@ jobs:
           $removed = 0
           foreach ($file in $inputs) {
             $lines = Get-Content -LiteralPath $file.FullName
-            $filtered = @($lines | Where-Object { $_ -notmatch '^\\s*pip-tools(?:\\s|[<=>!~\\[]|$)' })
+            $filtered = @($lines | Where-Object { $_ -notmatch '^\s*pip-tools(?:\s|[<=>!~\\[]|$)' })
             if ($filtered.Count -lt $lines.Count) {
               Set-Content -LiteralPath $file.FullName -Value $filtered -Encoding utf8
               Write-Host "Removed pip-tools from $($file.FullName)"
