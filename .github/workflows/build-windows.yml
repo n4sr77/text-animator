@@ -33,6 +33,56 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
           if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
 
+      - name: Bundle Google Fonts and fix Windows font discovery
+        shell: pwsh
+        run: |
+          $fontDir = Join-Path $env:GITHUB_WORKSPACE 'source\assets\fonts'
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $families = @(
+            @{ Name = 'NotoSans'; File = 'NotoSans[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf' },
+            @{ Name = 'NotoSansArabic'; File = 'NotoSansArabic[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf' },
+            @{ Name = 'Oswald'; File = 'Oswald[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald%5Bwght%5D.ttf' },
+            @{ Name = 'Poppins'; File = 'Poppins[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins%5Bwght%5D.ttf' },
+            @{ Name = 'Roboto'; File = 'Roboto[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf' },
+            @{ Name = 'Montserrat'; File = 'Montserrat[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf' },
+            @{ Name = 'PlayfairDisplay'; File = 'PlayfairDisplay[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf' },
+            @{ Name = 'JetBrainsMono'; File = 'JetBrainsMono[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf' }
+          )
+          foreach ($family in $families) {
+            $target = Join-Path $fontDir $family.File
+            Invoke-WebRequest -Uri $family.Url -OutFile $target
+            if ((Get-Item $target).Length -lt 10000) { throw "Downloaded font is unexpectedly small: $($family.Name)" }
+            $license = Join-Path $fontDir "$($family.Name)-OFL.txt"
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/google/fonts/main/ofl/$($family.Name.ToLowerInvariant())/OFL.txt" -OutFile $license
+          }
+          $fontsPy = 'source\text_animator\fonts.py'
+          $raw = Get-Content -LiteralPath $fontsPy -Raw
+          $anchor = '_SEARCH_ROOTS = ['
+          if (!$raw.Contains($anchor)) { throw 'Font search roots anchor missing.' }
+          $roots = @'
+_SEARCH_ROOTS = [
+    # App-bundled fonts (PyInstaller onedir stores these under _internal/assets/fonts).
+    Path(__file__).resolve().parents[1] / "assets" / "fonts",
+    # Windows machine and per-user font locations.
+    Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts",
+    Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Microsoft" / "Windows" / "Fonts",
+'@
+          $raw = $raw.Replace($anchor, $roots)
+          $raw = $raw.Replace('    "Noto Sans",', '    "Noto Sans",' + [Environment]::NewLine + '    "Noto Sans Arabic",')
+          Set-Content -LiteralPath $fontsPy -Value $raw -Encoding utf8
+          $spec = 'source\TextAnimator.spec'
+          $specRaw = Get-Content -LiteralPath $spec -Raw
+          $specAnchor = 'datas = []'
+          if (!$specRaw.Contains($specAnchor)) { throw 'PyInstaller datas anchor missing.' }
+          $specRaw = $specRaw.Replace($specAnchor, 'datas = [(str(ROOT / "assets" / "fonts"), "assets/fonts")]')
+          Set-Content -LiteralPath $spec -Value $specRaw -Encoding utf8
+          Write-Host "Bundled $($families.Count) Google Fonts families, including Arabic coverage, with OFL license files."
+          Push-Location source
+          try {
+            & py -3.11 -c "from text_animator.fonts import get_default_font, discover_fonts; name, path = get_default_font(); print('Font smoke test:', name, path); assert discover_fonts()"
+            if ($LASTEXITCODE -ne 0) { throw 'Bundled-font discovery smoke test failed.' }
+          } finally { Pop-Location }
+
       - name: Diagnose packaged font discovery and build configuration
         shell: pwsh
         run: |
