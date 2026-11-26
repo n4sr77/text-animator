@@ -2,7 +2,7 @@ name: Build TextAnimator Windows Installer
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/pro-presets-action-calm-sad']
     paths:
       - 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
       - '.github/workflows/build-windows.yml'
@@ -32,6 +32,42 @@ jobs:
           if (!(Test-Path $archive)) { throw "Source archive not found: $archive" }
           Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
           if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
+
+
+      - name: Apply six professional mood presets
+        shell: pwsh
+        run: |
+          $overlay = 'https://raw.githubusercontent.com/n4sr77/text-animator/feature/pro-presets-action-calm-sad/source-overlay'
+          New-Item -ItemType Directory -Force -Path 'source\text_animator\presets' | Out-Null
+          Invoke-WebRequest -Uri "$overlay/text_animator/presets/mood.py" -OutFile 'source\text_animator\presets\mood.py'
+          Invoke-WebRequest -Uri "$overlay/tests/test_mood_presets.py" -OutFile 'source\tests\test_mood_presets.py'
+          $registry = 'source\text_animator\presets\__init__.py'
+          $raw = Get-Content -LiteralPath $registry -Raw
+          $importAnchor = 'from .pulse_glow import PulseGlowPreset'
+          if (!$raw.Contains($importAnchor)) { throw 'Preset registry import anchor missing.' }
+          $imports = $importAnchor + "`r`nfrom .mood import ImpactStrikePreset, CinematicRushPreset, SoftFlowPreset, SerenityPreset, MelancholyFadePreset, RainyMemoriesPreset"
+          $raw = $raw.Replace($importAnchor, $imports)
+          $dictAnchor = '    "pulse_glow": PulseGlowPreset(),'
+          if (!$raw.Contains($dictAnchor)) { throw 'Preset registry dictionary anchor missing.' }
+          $dictAdd = $dictAnchor + "`r`n    'impact_strike': ImpactStrikePreset(),`r`n    'cinematic_rush': CinematicRushPreset(),`r`n    'soft_flow': SoftFlowPreset(),`r`n    'serenity': SerenityPreset(),`r`n    'melancholy_fade': MelancholyFadePreset(),`r`n    'rainy_memories': RainyMemoriesPreset(),"
+          $raw = $raw.Replace($dictAnchor, $dictAdd)
+          $labelAnchor = '    "pulse_glow": "Pulse Glow",'
+          if (!$raw.Contains($labelAnchor)) { throw 'Preset label anchor missing.' }
+          $labelAdd = $labelAnchor + "`r`n    'impact_strike': 'Action · Impact Strike',`r`n    'cinematic_rush': 'Action · Cinematic Rush',`r`n    'soft_flow': 'Calm · Soft Flow',`r`n    'serenity': 'Calm · Serenity',`r`n    'melancholy_fade': 'Sad · Melancholy Fade',`r`n    'rainy_memories': 'Sad · Rainy Memories',"
+          $raw = $raw.Replace($labelAnchor, $labelAdd)
+          Set-Content -LiteralPath $registry -Value $raw -Encoding utf8
+          $gui = 'source\text_animator\gui.py'
+          $guiRaw = Get-Content -LiteralPath $gui -Raw
+          $guiRaw = $guiRaw.Replace('10 animation presets', '17 animation presets')
+          $guiRaw = $guiRaw.Replace('11 animation presets', '17 animation presets')
+          Set-Content -LiteralPath $gui -Value $guiRaw -Encoding utf8
+          $readme = 'source\README.md'
+          if (Test-Path $readme) {
+            $readmeRaw = Get-Content -LiteralPath $readme -Raw
+            $readmeRaw = $readmeRaw.Replace('11 animation presets', '17 animation presets')
+            Set-Content -LiteralPath $readme -Value $readmeRaw -Encoding utf8
+          }
+          Write-Host 'Registered six new presets: two Action, two Calm and two Sad.'
 
       - name: Bundle Google Fonts and prepare Arabic rendering validation
         shell: pwsh
