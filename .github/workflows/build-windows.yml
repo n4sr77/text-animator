@@ -33,6 +33,20 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:GITHUB_WORKSPACE 'source') -Force
           if (!(Test-Path 'source\prepare_windows.ps1')) { throw 'The ZIP must contain prepare_windows.ps1 at its root.' }
 
+      - name: Diagnose packaged font discovery and build configuration
+        shell: pwsh
+        run: |
+          Write-Host '=== SOURCE FILE TREE ==='
+          Get-ChildItem -Path source -Recurse -File | ForEach-Object { $_.FullName.Substring((Resolve-Path source).Path.Length + 1) }
+          Write-Host '=== FONT MODULES ==='
+          $fontFiles = Get-ChildItem -Path source -Recurse -File | Where-Object { $_.Name -match 'font|spec|installer|build_windows' -and $_.Extension -in '.py','.spec','.ps1','.iss' }
+          foreach ($file in $fontFiles) {
+            Write-Host "=== FILE: $($file.FullName) ==="
+            if ($file.Name -match 'fonts?\.py|\.spec$|build_windows|build_installer') {
+              Get-Content -LiteralPath $file.FullName
+            }
+          }
+
       - name: Make FFmpeg regression fixture Windows-compatible
         shell: pwsh
         run: |
