@@ -75,7 +75,6 @@ jobs:
           $fontDir = Join-Path $env:GITHUB_WORKSPACE 'source\assets\fonts'
           New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
           $families = @(
-            @{ Name = 'NotoSans'; File = 'NotoSans[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf' },
             @{ Name = 'NotoSansArabic'; File = 'NotoSansArabic[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf' },
             @{ Name = 'NotoNaskhArabic'; File = 'NotoNaskhArabic[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf' },
             @{ Name = 'NotoKufiArabic'; File = 'NotoKufiArabic[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notokufiarabic/NotoKufiArabic%5Bwght%5D.ttf' },
