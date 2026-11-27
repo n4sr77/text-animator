@@ -175,18 +175,7 @@ jobs:
 
           Push-Location source
           try {
-            $fontCheck = @'
-          from pathlib import Path
-          from text_animator.fonts import discover_fonts, get_default_font
-          fonts = discover_fonts()
-          print("Discovered bundled fonts:", list(fonts))
-          assert len(fonts) >= 3, f"Expected at least 3 bundled fonts, found {len(fonts)}"
-          assert all(Path(path).is_file() for path in fonts.values())
-          name, path = get_default_font()
-          print("Default font:", name, path)
-          assert Path(path).is_file()
-          '@
-            & py -3.11 -c $fontCheck
+            & py -3.11 -c "from pathlib import Path; from text_animator.fonts import discover_fonts, get_default_font; fonts=discover_fonts(); print('Discovered bundled fonts:', list(fonts)); assert len(fonts) >= 3, f'Expected at least 3 bundled fonts, found {len(fonts)}'; assert all(Path(path).is_file() for path in fonts.values()); name, path=get_default_font(); print('Default font:', name, path); assert Path(path).is_file()"
             if ($LASTEXITCODE -ne 0) { throw 'Bundled font discovery validation failed.' }
           } finally { Pop-Location }
 
