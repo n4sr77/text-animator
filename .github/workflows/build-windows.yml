@@ -2,7 +2,7 @@ name: Build TextAnimator Windows Installer
 
 on:
   push:
-    branches: [main, 'feature/pro-presets-action-calm-sad']
+    branches: [main]
     paths:
       - 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
       - '.github/workflows/build-windows.yml'
