@@ -6,6 +6,7 @@ on:
     paths:
       - 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
       - '.github/workflows/build-windows.yml'
+      - 'source-overlay/**'
   workflow_dispatch:
 
 permissions:
