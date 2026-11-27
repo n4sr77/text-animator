@@ -31,3 +31,14 @@ def test_batch_preview_resolves_relative_audio_and_explicit_silence(tmp_path):
     app=SimpleNamespace(_gather_batch_params=_base,csv_entry=Var(str(csv)),batch_fixed_audio_var=Var(""))
     assert _payload(app,{"audio":"audio/music.mp3"})["audio_path"]==str(track.resolve())
     assert _payload(app,{"audio":"none"})["audio_path"] is None
+
+def test_random_audio_preview_uses_sample_without_consuming_batch_queue(tmp_path):
+    csv=tmp_path/"items.csv"; folder=tmp_path/"audios"; folder.mkdir()
+    first=folder/"a.mp3"; first.write_bytes(b"a")
+    second=folder/"b.wav"; second.write_bytes(b"b")
+    app=SimpleNamespace(_gather_batch_params=_base,csv_entry=Var(str(csv)),batch_fixed_audio_var=Var(""),
+        batch_audio_mode_var=Var("Random from folder"),_batch_audio_label_to_key={"Random from folder":"random"},
+        batch_audio_folder_var=Var(str(folder)))
+    result=_payload(app,{})
+    assert result["audio_path"]==str(first)
+    assert result["audio_label"]=="Sample from random folder: a.mp3"
