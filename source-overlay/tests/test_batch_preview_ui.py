@@ -64,7 +64,10 @@ def test_batch_preview_opens_in_app_video_popup(monkeypatch, tmp_path):
     video_preview.show_video_preview(app, video)
 
     assert isinstance(app._batch_video_preview_window, FakeWindow)
-    assert calls == [(app, str(video.resolve()))]
+    assert len(calls) == 1
+    assert calls[0][0] is app
+    from pathlib import Path
+    assert Path(calls[0][1]).resolve() == video.resolve()
 
 
 def test_batch_video_preview_time_formatting():
