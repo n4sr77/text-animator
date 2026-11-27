@@ -156,7 +156,8 @@ def _progress(app, current, total, message):
         skipped = sum(x.get("status") == "skipped" for x in results)
         failed = sum(x.get("status") == "error" for x in results)
         app.batch_counts_var.set(f"{done} rendered  ·  {skipped} skipped  ·  {failed} failed")
-        app.batch_progress_text_var.set(f"{pct}%  ·  {current}/{total} items  ·  {message[:85]}")
+        remaining = max(0, total - current)
+        app.batch_progress_text_var.set(f"{pct}%  ·  {current}/{total} done  ·  {remaining} remaining  ·  {message[:65]}")
     app.after(0, update)
 
 def install_batch_ui(app_class):
