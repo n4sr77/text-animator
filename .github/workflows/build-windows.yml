@@ -41,6 +41,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path 'source\text_animator\presets' | Out-Null
           Invoke-WebRequest -Uri "$overlay/text_animator/presets/mood.py" -OutFile 'source\text_animator\presets\mood.py'
           Invoke-WebRequest -Uri "$overlay/tests/test_mood_presets.py" -OutFile 'source\tests\test_mood_presets.py'
+          Invoke-WebRequest -Uri "$overlay/text_animator/batch_ui.py" -OutFile 'source\text_animator\batch_ui.py'
+          Invoke-WebRequest -Uri "$overlay/tests/test_batch_preview_ui.py" -OutFile 'source\tests\test_batch_preview_ui.py'
           $registry = 'source\text_animator\presets\__init__.py'
           $raw = Get-Content -LiteralPath $registry -Raw
           $importAnchor = 'from .pulse_glow import PulseGlowPreset'
@@ -61,6 +63,9 @@ jobs:
           $guiRaw = $guiRaw.Replace('10 animation presets', '17 animation presets')
           $guiRaw = $guiRaw.Replace('11 animation presets', '17 animation presets')
           Set-Content -LiteralPath $gui -Value $guiRaw -Encoding utf8
+          if (!$guiRaw.Contains('from .batch_ui import install_batch_ui')) {
+            Add-Content -LiteralPath $gui -Value "`r`nfrom .batch_ui import install_batch_ui as _install_batch_ui`r`n_install_batch_ui(TextAnimatorApp)" -Encoding utf8
+          }
           $readme = 'source\README.md'
           if (Test-Path $readme) {
             $readmeRaw = Get-Content -LiteralPath $readme -Raw
