@@ -115,6 +115,7 @@ class BatchVideoPreviewWindow:
         self._frame_queue = queue.Queue(maxsize=4)
         self._meta_queue = queue.Queue(maxsize=1)
         self._decoder_done = threading.Event()
+        done_event = self._decoder_done
         self._decoder_error = None
         self._seek_origin = max(0.0, float(start_seconds))
         self._position = self._seek_origin
@@ -160,7 +161,8 @@ class BatchVideoPreviewWindow:
                         reader.close()
                     except Exception:
                         pass
-                self._decoder_done.set()
+                # Keep an old decoder from marking a newer seek's event as complete.
+                done_event.set()
 
         threading.Thread(target=decode, name="BatchPreviewDecoder", daemon=True).start()
 
