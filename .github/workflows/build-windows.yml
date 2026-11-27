@@ -286,6 +286,27 @@ jobs:
         working-directory: source
         run: ./build_windows.ps1
 
+      - name: Smoke-test packaged GUI startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'source\dist\TextAnimator\TextAnimator.exe'
+          if (!(Test-Path $exe)) { throw "Packaged executable not found: $exe" }
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
+          try {
+            Start-Sleep -Seconds 10
+            $process.Refresh()
+            if ($process.HasExited) {
+              throw "The packaged GUI exited during startup smoke test (exit code $($process.ExitCode))."
+            }
+            Write-Host "GUI remained running for 10 seconds (PID $($process.Id))."
+          } finally {
+            $process.Refresh()
+            if (!$process.HasExited) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              Wait-Process -Id $process.Id -Timeout 5 -ErrorAction SilentlyContinue
+            }
+          }
+
       - name: Build persistent Windows installer
         shell: pwsh
         working-directory: source
