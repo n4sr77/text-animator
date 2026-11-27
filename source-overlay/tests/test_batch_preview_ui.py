@@ -42,3 +42,34 @@ def test_random_audio_preview_uses_sample_without_consuming_batch_queue(tmp_path
     result=_payload(app,{})
     assert result["audio_path"]==str(first)
     assert result["audio_label"]=="Sample from random folder: a.mp3"
+
+
+def test_batch_preview_opens_in_app_video_popup(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from text_animator import video_preview
+
+    calls = []
+
+    class FakeWindow:
+        def __init__(self, app, path):
+            calls.append((app, path))
+
+        def close(self):
+            calls.append("closed")
+
+    monkeypatch.setattr(video_preview, "BatchVideoPreviewWindow", FakeWindow)
+    app = SimpleNamespace()
+    video = tmp_path / "batch-preview.mp4"
+
+    video_preview.show_video_preview(app, video)
+
+    assert isinstance(app._batch_video_preview_window, FakeWindow)
+    assert calls == [(app, str(video.resolve()))]
+
+
+def test_batch_video_preview_time_formatting():
+    from text_animator.video_preview import BatchVideoPreviewWindow
+
+    assert BatchVideoPreviewWindow._format_time(0) == "00:00"
+    assert BatchVideoPreviewWindow._format_time(65.8) == "01:05"
+    assert BatchVideoPreviewWindow._format_time(-4) == "00:00"
