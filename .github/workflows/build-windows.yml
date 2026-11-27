@@ -330,3 +330,21 @@ jobs:
           path: source/installer-output/*Setup.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish downloadable Windows installer release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v3.2.0
+          target_commitish: main
+          name: TextAnimator v3.2.0 — Windows installer
+          body: |
+            Windows x64 per-user installer for TextAnimator 3.2.0.
+
+            The installer includes the packaged Python runtime, dependencies, bundled Arabic-capable fonts, FFmpeg, and the Batch preview player. It installs under the current user's Local AppData folder and includes an uninstaller.
+          files: source/installer-output/TextAnimator-v3.2.0-Setup.exe
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
