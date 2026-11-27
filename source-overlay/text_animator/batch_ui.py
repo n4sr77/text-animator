@@ -31,16 +31,28 @@ def _payload(app, row):
     color = str(row.get("color_mode") or base["color_mode"]).strip()
     if color not in COLOR_MODES: color = base["color_mode"]
     csv_path = Path(app.csv_entry.get().strip()).expanduser()
+    csv_path = Path(app.csv_entry.get().strip()).expanduser()
     bg = str(row.get("bg_image") or base["bg_image_path"] or "").strip() or None
-    if bg and not Path(bg).expanduser().is_absolute(): bg = str((csv_path.resolve().parent / bg).resolve())
     if bg and not Path(bg).is_file(): bg = base["bg_image_path"]
     audio_value = str(row.get("audio") or "").strip()
-    if audio_value.lower() in {"none", "silent", "off", "-"}: audio = None
+    if audio_value.lower() in {"none", "silent", "off", "-"}:
+        audio, audio_label = None, "Silence (CSV override)"
     elif audio_value:
         audio_path = Path(audio_value).expanduser()
         if not audio_path.is_absolute(): audio_path = csv_path.resolve().parent / audio_path
-        audio = str(audio_path.resolve())
-    else: audio = app.batch_fixed_audio_var.get().strip() or None
+        audio, audio_label = str(audio_path.resolve()), "CSV soundtrack"
+    elif app.batch_fixed_audio_var.get().strip():
+        audio, audio_label = app.batch_fixed_audio_var.get().strip(), "Fixed batch soundtrack"
+    elif getattr(app, "_batch_audio_label_to_key", {}).get(
+        app.batch_audio_mode_var.get() if hasattr(app, "batch_audio_mode_var") else "", "fixed"
+    ) == "random":
+        folder = Path(app.batch_audio_folder_var.get().strip()).expanduser()
+        supported = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".aiff", ".wma", ".alac"}
+        tracks = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in supported) if folder.is_dir() else []
+        audio = str(tracks[0]) if tracks else None
+        audio_label = f"Sample from random folder: {tracks[0].name}" if tracks else "Random folder has no supported tracks"
+    else:
+        audio, audio_label = None, "No soundtrack"
     transition = str(row.get("transition") or base["transition"]).strip().lower()
     if transition not in {"fade", "cut", "zoom"}: transition = base["transition"]
     return {
@@ -55,7 +67,7 @@ def _payload(app, row):
         "auto_fit_font": _boolean(row, "auto_fit_font", base["auto_fit_font"]),
         "transition": transition,
         "transition_duration": max(0., min(1.5, _number(row, "transition_duration", base["transition_duration"], float))),
-        "audio_path": audio,
+        "audio_path": audio, "audio_label": audio_label,
         "audio_volume": max(0., min(1., _number(row, "audio_volume", base["audio_volume"], float))),
         "audio_fade_in": max(0., _number(row, "audio_fade_in", base["audio_fade_in"], float)),
         "audio_fade_out": max(0., _number(row, "audio_fade_out", base["audio_fade_out"], float)),
@@ -90,7 +102,7 @@ def _refresh(app, _event=None):
             f"Word: {p['word_duration']:.2f}s   Gap: {p['gap']:.2f}s\n"
             f"Transition: {p['transition']}   ·   Outline: {'On' if p['outline'] else 'Off'}"
             f"   ·   Shadow: {'On' if p['shadow'] else 'Off'}\n"
-            f"Audio: {'Selected track' if p['audio_path'] else 'No preview track'}"
+            f"Audio: {p['audio_label']}"
         )
     except Exception as exc:
         app.batch_preview_title_var.set(f"ROW {i:02d}  ·  {title}")
