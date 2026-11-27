@@ -38,7 +38,7 @@ jobs:
       - name: Apply six professional mood presets
         shell: pwsh
         run: |
-          $overlay = 'https://raw.githubusercontent.com/n4sr77/text-animator/feature/pro-presets-action-calm-sad/source-overlay'
+          $overlay = 'https://raw.githubusercontent.com/n4sr77/text-animator/82a755d204acc223d2245fe3947e850db1072044/source-overlay'
           New-Item -ItemType Directory -Force -Path 'source\text_animator\presets' | Out-Null
           Invoke-WebRequest -Uri "$overlay/text_animator/presets/mood.py" -OutFile 'source\text_animator\presets\mood.py'
           Invoke-WebRequest -Uri "$overlay/tests/test_mood_presets.py" -OutFile 'source\tests\test_mood_presets.py'
