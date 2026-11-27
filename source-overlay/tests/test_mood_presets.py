@@ -27,8 +27,8 @@ class TestMoodPresetRegistry(unittest.TestCase):
     def test_each_builds_video(self):
         from text_animator.presets import PRESETS
         from text_animator.presets.base import RenderContext
-        from PIL import ImageFont
-        font = ImageFont.truetype("DejaVuSans.ttf", 20).path
+        from text_animator.fonts import get_default_font
+        _font_name, font = get_default_font()
         ctx = RenderContext(["Test"], (640,360), str(font), 48, "white",
             (12,14,20), 1.4, 0.1, 0.2, 12)
         for key in ("impact_strike","cinematic_rush","soft_flow","serenity","melancholy_fade","rainy_memories"):
