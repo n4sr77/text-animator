@@ -8,6 +8,7 @@ from .batch import TITLE_KEYS, TEXT_KEYS, resolve_resolution
 from .config import COLOR_MODES
 from .presets import PRESET_NAMES
 from .renderer import RenderCancelled
+from .video_preview import show_video_preview
 
 def _value(row, keys, default=""):
     return next((str(row.get(k, "")).strip() for k in keys if row.get(k)), default)
@@ -134,7 +135,7 @@ def _render_preview(app):
                 audio_volume=p["audio_volume"], audio_fade_in=p["audio_fade_in"],
                 audio_fade_out=p["audio_fade_out"], bg_image_path=p["bg_image_path"],
                 hardware_backend=p["hardware_backend"], progress_callback=app._progress_cb)
-            app.after(0, lambda path=path: app._open_file(path))
+            app.after(0, lambda path=path: show_video_preview(app, path))
             app.after(0, lambda: app._set_status(f"Preview ready · Batch row {i}"))
         except RenderCancelled:
             app.after(0, lambda: app._set_status("Batch row preview cancelled"))
