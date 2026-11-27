@@ -2,7 +2,7 @@ name: Build TextAnimator Windows Installer
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/pro-presets-action-calm-sad']
     paths:
       - 'TextAnimator-v3.2.0-GitHub-Installer-Source.zip'
       - '.github/workflows/build-windows.yml'
@@ -42,6 +42,7 @@ jobs:
           Invoke-WebRequest -Uri "$overlay/text_animator/presets/mood.py" -OutFile 'source\text_animator\presets\mood.py'
           Invoke-WebRequest -Uri "$overlay/tests/test_mood_presets.py" -OutFile 'source\tests\test_mood_presets.py'
           Invoke-WebRequest -Uri "$overlay/text_animator/batch_ui.py" -OutFile 'source\text_animator\batch_ui.py'
+          Invoke-WebRequest -Uri "$overlay/text_animator/video_preview.py" -OutFile 'source\text_animator\video_preview.py'
           Invoke-WebRequest -Uri "$overlay/tests/test_batch_preview_ui.py" -OutFile 'source\tests\test_batch_preview_ui.py'
           $registry = 'source\text_animator\presets\__init__.py'
           $raw = Get-Content -LiteralPath $registry -Raw
@@ -74,51 +75,122 @@ jobs:
           }
           Write-Host 'Registered six new presets: two Action, two Calm and two Sad.'
 
-      - name: Bundle Google Fonts and prepare Arabic rendering validation
+      - name: Download real Arabic font binaries and bundle them
         shell: pwsh
         run: |
           $fontDir = Join-Path $env:GITHUB_WORKSPACE 'source\assets\fonts'
-          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $tempRoot = Join-Path $env:RUNNER_TEMP 'textanimator-fonts'
+          New-Item -ItemType Directory -Force -Path $fontDir, $tempRoot | Out-Null
+
+          # Google Fonts' raw GitHub binary URLs can return Git-LFS pointer files.
+          # Download the upstream release archives instead, then extract the real TTFs.
           $families = @(
-            @{ Name = 'NotoSansArabic'; File = 'NotoSansArabic[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf' },
-            @{ Name = 'NotoNaskhArabic'; File = 'NotoNaskhArabic[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/NotoNaskhArabic%5Bwght%5D.ttf' },
-            @{ Name = 'NotoKufiArabic'; File = 'NotoKufiArabic[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notokufiarabic/NotoKufiArabic%5Bwght%5D.ttf' },
-            @{ Name = 'Oswald'; File = 'Oswald[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald%5Bwght%5D.ttf' },
-            @{ Name = 'Poppins'; File = 'Poppins[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins%5Bwght%5D.ttf' },
-            @{ Name = 'Roboto'; File = 'Roboto[wdth,wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf' },
-            @{ Name = 'Montserrat'; File = 'Montserrat[wght].ttf'; Url = 'https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf' }
+            @{
+              Name = 'NotoSansArabic'
+              File = 'NotoSansArabic[wdth,wght].ttf'
+              Archive = 'https://github.com/notofonts/arabic/releases/download/NotoSansArabic-v2.012/NotoSansArabic-v2.012.zip'
+              License = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosansarabic/OFL.txt'
+            },
+            @{
+              Name = 'NotoNaskhArabic'
+              File = 'NotoNaskhArabic[wght].ttf'
+              Archive = 'https://github.com/notofonts/arabic/releases/download/NotoNaskhArabic-v2.021/NotoNaskhArabic-v2.021.zip'
+              License = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notonaskharabic/OFL.txt'
+            },
+            @{
+              Name = 'NotoKufiArabic'
+              File = 'NotoKufiArabic[wght].ttf'
+              Archive = 'https://github.com/notofonts/arabic/releases/download/NotoKufiArabic-v2.109/NotoKufiArabic-v2.109.zip'
+              License = 'https://raw.githubusercontent.com/google/fonts/main/ofl/notokufiarabic/OFL.txt'
+            }
           )
+
           foreach ($family in $families) {
+            $archivePath = Join-Path $tempRoot "$($family.Name).zip"
+            $extractDir = Join-Path $tempRoot $family.Name
+            Invoke-WebRequest -Uri $family.Archive -OutFile $archivePath
+            if ((Get-Item $archivePath).Length -lt 100000) {
+              throw "The upstream font archive is unexpectedly small: $($family.Name)"
+            }
+            Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
+            $font = Get-ChildItem -Path $extractDir -Recurse -File |
+              Where-Object { $_.Name -ceq $family.File } |
+              Select-Object -First 1
+            if (!$font) { throw "The TTF file was not found in the release archive: $($family.File)" }
+
             $target = Join-Path $fontDir $family.File
-            Invoke-WebRequest -Uri $family.Url -OutFile $target
-            if ((Get-Item $target).Length -lt 10000) { throw "Invalid font download: $($family.Name)" }
-            $licenseName = $family.Name.ToLowerInvariant()
-            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/google/fonts/main/ofl/$licenseName/OFL.txt" -OutFile (Join-Path $fontDir "$($family.Name)-OFL.txt")
+            Copy-Item -LiteralPath $font.FullName -Destination $target -Force
+            $bytes = [System.IO.File]::ReadAllBytes($target)
+            $signature = [BitConverter]::ToString($bytes, 0, 4)
+            if ($bytes.Length -lt 100000 -or $signature -notin @('00-01-00-00', '4F-54-54-4F')) {
+              throw "Invalid or incomplete TTF binary: $($family.Name) ($($bytes.Length) bytes, $signature)"
+            }
+
+            $licensePath = Join-Path $fontDir "$($family.Name)-OFL.txt"
+            Invoke-WebRequest -Uri $family.License -OutFile $licensePath
+            if ((Get-Item $licensePath).Length -lt 1000) {
+              throw "The OFL license download is incomplete: $($family.Name)"
+            }
+            Write-Host "Bundled $($family.Name): $($bytes.Length) bytes"
           }
+
           $fontsPy = 'source\text_animator\fonts.py'
           $raw = Get-Content -LiteralPath $fontsPy -Raw
-          $anchor = '_SEARCH_ROOTS = ['
-          if (!$raw.Contains($anchor)) { throw 'Font search roots anchor missing.' }
-          $insert = $anchor + [Environment]::NewLine + '    Path(__file__).resolve().parents[1] / "assets" / "fonts",'
-          $raw = $raw.Replace($anchor, $insert)
-          $raw = $raw.Replace('    "Noto Sans",', '    "Noto Sans",' + [Environment]::NewLine + '    "Noto Sans Arabic",' + [Environment]::NewLine + '    "Noto Naskh Arabic",' + [Environment]::NewLine + '    "Noto Kufi Arabic",')
+          $rootsAnchor = '_SEARCH_ROOTS = ['
+          if (!$raw.Contains($rootsAnchor)) { throw 'Font search roots anchor missing.' }
+          if (!$raw.Contains('Path(__file__).resolve().parents[1] / "assets" / "fonts"')) {
+            $roots = @(
+              '    Path(__file__).resolve().parents[1] / "assets" / "fonts",',
+              '    Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts",',
+              '    Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Microsoft" / "Windows" / "Fonts",'
+            ) -join [Environment]::NewLine
+            $raw = $raw.Replace($rootsAnchor, $rootsAnchor + [Environment]::NewLine + $roots)
+          }
+          $preferredAnchor = '    "Noto Sans",'
+          if (!$raw.Contains($preferredAnchor)) { throw 'Preferred font family anchor missing.' }
+          if (!$raw.Contains('"Noto Sans Arabic"')) {
+            $preferred = $preferredAnchor + [Environment]::NewLine +
+              '    "Noto Sans Arabic",' + [Environment]::NewLine +
+              '    "Noto Naskh Arabic",' + [Environment]::NewLine +
+              '    "Noto Kufi Arabic",'
+            $raw = $raw.Replace($preferredAnchor, $preferred)
+          }
+          $defaultAnchor = 'for preferred in ["DejaVu Sans Bold", "Liberation Sans Bold", "Anton", "Oswald"]:'
+          if ($raw.Contains($defaultAnchor)) {
+            $raw = $raw.Replace(
+              $defaultAnchor,
+              'for preferred in ["DejaVu Sans Bold", "Liberation Sans Bold", "Anton", "Oswald", "NotoSansArabic[wdth,wght]"]:'
+            )
+          }
           Set-Content -LiteralPath $fontsPy -Value $raw -Encoding utf8
+
           $spec = 'source\TextAnimator.spec'
           $specRaw = Get-Content -LiteralPath $spec -Raw
           if (!$specRaw.Contains('datas = []')) { throw 'PyInstaller datas anchor missing.' }
-          $specRaw = $specRaw.Replace('datas = []', 'datas = [(str(ROOT / "assets" / "fonts"), "assets/fonts")]')
+          $specRaw = $specRaw.Replace(
+            'datas = []',
+            'datas = [(str(ROOT / "assets" / "fonts"), "assets/fonts")]'
+          )
           Set-Content -LiteralPath $spec -Value $specRaw -Encoding utf8
-          Write-Host 'Downloaded Google Fonts including Noto Sans Arabic, Noto Naskh Arabic and Noto Kufi Arabic.'
-          Write-Host '=== ARABIC RENDERING SOURCE AUDIT ==='
-          foreach ($path in @('source\text_animator\renderer.py','source\text_animator\text_utils.py','source\text_animator\preview.py','source\text_animator\fonts.py','source\requirements-windows.in','source\TextAnimator.spec')) {
-            Write-Host "=== $path ==="
-            Get-Content -LiteralPath $path
-          }
+
           Push-Location source
           try {
-            & py -3.11 -c "from text_animator.fonts import get_default_font, discover_fonts; n,p=get_default_font(); print('Default font:',n,p); print('Found fonts:',len(discover_fonts())); assert len(discover_fonts()) >= 8"
+            $fontCheck = @'
+          from pathlib import Path
+          from text_animator.fonts import discover_fonts, get_default_font
+          fonts = discover_fonts()
+          print("Discovered bundled fonts:", list(fonts))
+          assert len(fonts) >= 3, f"Expected at least 3 bundled fonts, found {len(fonts)}"
+          assert all(Path(path).is_file() for path in fonts.values())
+          name, path = get_default_font()
+          print("Default font:", name, path)
+          assert Path(path).is_file()
+          '@
+            & py -3.11 -c $fontCheck
             if ($LASTEXITCODE -ne 0) { throw 'Bundled font discovery validation failed.' }
           } finally { Pop-Location }
+
+          Write-Host 'Arabic fonts are bundled and discoverable; their licenses are included.'
 
       - name: Diagnose packaged font discovery and build configuration
         shell: pwsh
