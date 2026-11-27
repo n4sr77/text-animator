@@ -31,7 +31,6 @@ def _payload(app, row):
     color = str(row.get("color_mode") or base["color_mode"]).strip()
     if color not in COLOR_MODES: color = base["color_mode"]
     csv_path = Path(app.csv_entry.get().strip()).expanduser()
-    csv_path = Path(app.csv_entry.get().strip()).expanduser()
     bg = str(row.get("bg_image") or base["bg_image_path"] or "").strip() or None
     if bg and not Path(bg).is_file(): bg = base["bg_image_path"]
     audio_value = str(row.get("audio") or "").strip()
